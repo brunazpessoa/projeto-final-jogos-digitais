@@ -4,7 +4,7 @@
 </div>
 
 <div align="center">
-Bruna Zakaib Pessoa - 10417079 | Isabela Reali da Costa – 10439161 | João Vitor Macea - 
+Bruna Zakaib Pessoa - 10417079 | Isabela Reali da Costa – 10439161 | João Vitor Macea - 10437139
 </div>
 <hr>
 <br>
