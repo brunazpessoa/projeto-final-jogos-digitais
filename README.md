@@ -1,6 +1,6 @@
 
 <div align="center">
-  <h1>PIQUE-FLOREST</h1>
+  <h1>PIQUE-FOREST</h1>
 </div>
 
 <div align="center">
