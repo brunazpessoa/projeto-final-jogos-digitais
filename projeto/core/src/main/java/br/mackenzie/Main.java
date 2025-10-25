@@ -35,6 +35,7 @@ public class Main implements ApplicationListener {
     private TextureRegion currentFrame;
     private float stateTime; // Tempo acumulado para controle da animação
 
+    private float playerSpeedModifier = 0;
     private float playerSize = 80f; // Tamanho do personagem em unidades de mundo
     private boolean isMoving = false; // Indica se o personagem está se movendo
     private boolean facingRight = true; // Indica a direção para o espelhamento
@@ -128,16 +129,29 @@ public class Main implements ApplicationListener {
         float delta = Gdx.graphics.getDeltaTime();
         isMoving = false;
 
-        if (Gdx.input.isKeyPressed(Input.Keys.RIGHT)) {
-            playerX += speed * delta;
-            isMoving = true;
-            facingRight = true;
-        } else if (Gdx.input.isKeyPressed(Input.Keys.LEFT)) {
-            playerX -= speed * delta;
-            isMoving = true;
-            facingRight = false;
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE)) {
+            if(playerSpeedModifier<1000) {
+                playerSpeedModifier += 75F;
+                playerX += playerSpeedModifier * delta;
+                isMoving = true;
+                facingRight = true;
+            }
+            if(playerSpeedModifier == 1000){
+                playerX += playerSpeedModifier * delta;
+                isMoving = true;
+                facingRight = true;
+            }
+        }
+        else{
+            if(playerSpeedModifier>0) {
+                playerSpeedModifier -= 8F;
+                playerX += playerSpeedModifier * delta;
+                isMoving = true;
+                facingRight = true;
+            }
         }
     }
+
 
     // Desenha todos os elementos na tela
     private void draw() {
