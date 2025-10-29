@@ -5,7 +5,7 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 
-public class Animal {
+public abstract class Animal {
     private Vector2 posicao; // posição do animal
     private float velocidade;
     private float largura; //dimensões do animal
