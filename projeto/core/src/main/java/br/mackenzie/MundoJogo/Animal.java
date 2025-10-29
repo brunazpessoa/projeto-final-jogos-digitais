@@ -6,7 +6,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 
 public abstract class Animal {
-    private Vector2 posicao; // posição do animal
+    private Vector2 posicao; // posição animal
     private float velocidade;
     private float largura; //dimensões do animal
     private float altura;
@@ -54,7 +54,7 @@ public abstract class Animal {
         return posicao;
     }
 
-    // retorna se o animal saiu da tela 
+    // retorna se o animal saiu da tela
     public boolean estaForaDaTela() {
         return posicao.x + largura < 0; // se saiu da tela
     }
