@@ -21,6 +21,3 @@ O presente trabalho descreve o desenvolvimento de um jogo interativo criado com 
 O jogo se passa em uma floresta, apresentando desafios crescentes representados pelos animais que tentam roubar a cesta de piquenique do personagem principal. São três fases, com dificuldade gradativamente aumentada, promovendo evolução progressiva das habilidades motoras do jogador e estimulando foco e treino. Essa abordagem possibilita que o paciente assuma um papel ativo em seu próprio desenvolvimento funcional, recebendo feedback imediato de seu desempenho e percebendo de forma tangível o impacto de suas ações.
 Socialmente, o projeto contribui significativamente ao possibilitar que pacientes de todas as idades participem de exercícios terapêuticos de forma lúdica, segura e divertida. Jogos digitais voltados para integração de tecnologia e auxílio em atividades fisioterápicas são de suma importância, combinam entretenimento com exercícios físicos, incentivando o engajamento, mostrando evolução e pontos de melhoria de forma imediata e acelerando os resultados do tratamento.
 
-# Diagrama de classes 
-## Representação das classes do jogo:
-<img width="3010" height="1094" alt="image" src="https://github.com/user-attachments/assets/a0d65115-ce63-4e0e-8a6c-301f62501679" />
