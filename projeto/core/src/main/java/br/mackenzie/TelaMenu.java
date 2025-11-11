@@ -34,6 +34,9 @@ public class TelaMenu implements Screen {
     private BitmapFont fontBotao;
     private Texture texturaBackground;
 
+    // Trilha sonora do Menu
+    private Music menuMusic;
+
     // Nomes dos arquivos de fontes (AJUSTE ESTES NOMES se os seus forem diferentes)
     private static final String NOME_FONTE = "fonteMenu.ttf";
 
@@ -52,6 +55,12 @@ public class TelaMenu implements Screen {
 
         // --- 2. Carregamento de Texturas ---
         texturaBackground = new Texture(Gdx.files.internal("background.png"));
+
+        //carregando a música
+        menuMusic = Gdx.audio.newMusic(Gdx.files.internal("som_menu.mp3"));
+        menuMusic.setLooping(true);  //repetição da música
+        menuMusic.setVolume(0.5f);  //definindo volume
+
 
 
         // ====================================================================
@@ -161,7 +170,11 @@ public class TelaMenu implements Screen {
 
     @Override
     public void show() {
+
         Gdx.input.setInputProcessor(stage);
+        if (menuMusic != null && !menuMusic.isPlaying()) {
+            menuMusic.play();
+        }
     }
 
     @Override
@@ -212,6 +225,11 @@ public class TelaMenu implements Screen {
 
         if (generator != null) {
             generator.dispose();
+        }
+
+        if(menuMusic != null) {
+            menuMusic.stop();
+            menuMusic.dispose();
         }
     }
 }
