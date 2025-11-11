@@ -170,9 +170,9 @@ public class TelaMenu implements Screen {
 
     @Override
     public void show() {
-
         Gdx.input.setInputProcessor(stage);
-        if (menuMusic != null && !menuMusic.isPlaying()) {
+
+        if (menuMusic != null && !menuMusic.isPlaying()) { //toca a musica quando a tela MENU aparece
             menuMusic.play();
         }
     }
@@ -228,8 +228,8 @@ public class TelaMenu implements Screen {
         }
 
         if(menuMusic != null) {
-            menuMusic.stop();
-            menuMusic.dispose();
+            menuMusic.stop(); //para a musica
+            menuMusic.dispose(); //toca
         }
     }
 }
