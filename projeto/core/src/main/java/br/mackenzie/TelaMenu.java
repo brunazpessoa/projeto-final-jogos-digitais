@@ -38,6 +38,8 @@ public class TelaMenu implements Screen {
     // Trilha sonora do Menu
     private Music menuMusic;
 
+    private Sounf clickSound;
+
     // Nomes dos arquivos de fontes (AJUSTE ESTES NOMES se os seus forem diferentes)
     private static final String NOME_FONTE = "fonteMenu.ttf";
 
@@ -61,6 +63,15 @@ public class TelaMenu implements Screen {
         menuMusic = Gdx.audio.newMusic(Gdx.files.internal("som_menu.mp3"));
         menuMusic.setLooping(true);  //repetição da música
         menuMusic.setVolume(0.5f);  //definindo volume
+
+        // carregando som do click nos botoes
+        if (Gdx.files.internal("click_botao_madeira.mp3").exists()){
+            clickSound = Gdx.audio.newSound(Gdx.files.internal("click_botao_madeira.mp3"));
+        }else{
+            clickSound = null; // fallback silencioso
+        }
+
+
 
 
 
@@ -231,6 +242,10 @@ public class TelaMenu implements Screen {
         if(menuMusic != null) {
             menuMusic.stop(); //para a musica
             menuMusic.dispose(); //toca
+        }
+
+        if (clickSound != null) {
+            clickSound.dispose();
         }
     }
 }
