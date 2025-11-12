@@ -3,6 +3,7 @@ package br.mackenzie;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -38,7 +39,7 @@ public class TelaMenu implements Screen {
     // Trilha sonora do Menu
     private Music menuMusic;
 
-    private Sounf clickSound;
+    private Sound clickSound;
 
     // Nomes dos arquivos de fontes (AJUSTE ESTES NOMES se os seus forem diferentes)
     private static final String NOME_FONTE = "fonteMenu.ttf";

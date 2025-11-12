@@ -3,6 +3,7 @@ package br.mackenzie;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
@@ -55,6 +56,13 @@ public class TelaJogo implements Screen {
     // Estado do Jogo (usa o enum traduzido)
     EstadoJogo estado = EstadoJogo.CORRENDO;
 
+    // config som dos passos
+    private Sound passoSound;
+    private float prevPlayerX = 0f; // posição do jogador no frame anterior
+    private float stepTimer = 0f; // tempo acumulado para o próximo passo do jogador
+    private float stepInterval = 0.35f; // intervalo entre passos
+    private float moveThreshold = 1f;  // distancia minima
+
     // ====================================================================================
     // MÉTODOS DA INTERFACE SCREEN
     // ====================================================================================
@@ -85,6 +93,14 @@ public class TelaJogo implements Screen {
         estado = EstadoJogo.CORRENDO;
 
         camera.position.set(larguraMundo / 2f, alturaMundo / 2f, 0);
+
+        if (Gdx.files.internal("passos.mp3").exists()){
+            passoSound = Gdx.audio.newSound(Gdx.files.internal("passos.mp3"));
+        }else{
+            passoSound = null;
+        }
+
+        prevPlayerX = jogador.x;
     }
 
     @Override
@@ -101,6 +117,13 @@ public class TelaJogo implements Screen {
             checarSpawnRaposa();
             if (raposa.ativo) raposa.atualizar(delta, jogador.x, camera, viewport);
 
+            // LÓGICA PASSOS
+            passoSound.play(0.5f, 0.8f, 0f);
+            //0.5 - reduz volume
+            //0.8 - som lento e grave
+            //0 - centraliza o som
+
+
             // 3. Lógica de Vitória
             cesta.checarSpawn(jogador.x, jogador.tamanho, jogador.x - posicaoInicialX, DISTANCIA_VITORIA);
 
@@ -113,6 +136,35 @@ public class TelaJogo implements Screen {
 
         // 5. DESENHO
         desenhar();
+    }
+
+    // Método que decide quando tocar passos
+    private void handleFootsteps(float delta) {
+        if (passoSound == null) return; // não faz nada se som não carregou
+
+        // calcula deslocamento horizontal desde o frame anterior
+        float dx = Math.abs(jogador.x - prevPlayerX);
+
+        // aqui você pode refinar: talvez checar se jogador está "no chão" se houver pulo
+        boolean isMoving = dx > moveThreshold * (1f/UNIDADES_POR_METRO);
+        // OBS: moveThreshold está em pixels do mundo, ajustamos por unidade por metro para ficar coerente.
+        // Se seu Jogador usa velocidade muito grande/pequena, ajuste moveThreshold.
+
+        if (isMoving) {
+            // acumula tempo enquanto move
+            stepTimer += delta;
+            if (stepTimer >= stepInterval) {
+                // toca som curto de passo
+                passoSound.play(0.7f); // volume 0.7 — ajuste se necessário
+                stepTimer = 0f;
+            }
+        } else {
+            // se não está se movendo, resetamos temporizador pra evitar tocar passos instantaneamente
+            stepTimer = 0f;
+        }
+
+        // atualiza prevPlayerX para o próximo frame
+        prevPlayerX = jogador.x;
     }
 
     @Override
@@ -132,6 +184,10 @@ public class TelaJogo implements Screen {
         raposa.dispose();
         cesta.dispose();
         texturaFundo.dispose();
+
+        if (passoSound != null) {
+            passoSound.dispose();
+        }
     }
 
     // --- MÉTODOS DE LÓGICA ---
