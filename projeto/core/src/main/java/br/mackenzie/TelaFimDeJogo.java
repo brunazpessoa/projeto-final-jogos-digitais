@@ -2,6 +2,8 @@ package br.mackenzie;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -12,20 +14,38 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType;
 
+/**
+ * Tela de Game Over / Vitória.
+ */
 public class TelaFimDeJogo implements Screen {
 
+    // Referências principais
     final JogoPrincipal game;
     OrthographicCamera camera;
-    BitmapFont font;         // usada para estatísticas e instrução (fonte da tela menu)
-    BitmapFont titleFont;    // usada somente para o título (fonte padrão libgdx)
+
+    // Fontes e imagens
+    BitmapFont font;         // usada apenas para o botão (TTF, se existir)
+    BitmapFont titleFont;    // usada para título e estatísticas (Bitmap padrão)
+    private Texture texturaBackground;
+    private static final String NOME_FONTE = "fonteMenu.ttf";
     String message;
     Color messageColor;
 
-    // Fundo e Fonte (iguais ao da TelaMenu)
-    private Texture texturaBackground;
-    private static final String NOME_FONTE = "fonteMenu.ttf";
+    // Sons
+    private Music perdeuSom;
+    private Music ganhouSom;
+    private Sound clickSound;
 
-    // ATRIBUTOS DE ESTATÍSTICAS
+    // Estética do botão
+    Color corFundoNormal = new Color(0.8f, 0.5f, 0.0f, 1.0f);
+    Color corFundoPressionado = new Color(1.0f, 0.7f, 0.0f, 1.0f);
+    private final float BOTAO_LARGURA = 350;
+    private final float BOTAO_ALTURA = 80;
+
+    // coordenadas do botão (calculadas no render)
+    private float botaoX, botaoY;
+
+    // Estatísticas do jogo
     private float finalTime;
     private float finalDistance; // Já armazenada em metros
     private int finalPresses;
@@ -34,68 +54,84 @@ public class TelaFimDeJogo implements Screen {
     // Constante de conversão
     private final float UNITS_PER_METER = 100f;
 
-    // ShapeRenderer para desenhar o painel de fundo
+    // Desenho do painel
     private ShapeRenderer shapeRenderer;
 
-    // Construtor que recebe o estado final e as estatísticas
+    // Controle de som e estado
+    private boolean somTocado = false;
+    private boolean venceu = false;
+
+    // Construtor
     public TelaFimDeJogo(final JogoPrincipal game, EstadoJogo estadoFinal, float time, float distance, int presses) {
         this.game = game;
 
+        // câmera
         camera = new OrthographicCamera();
         camera.setToOrtho(false, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
-        // Inicializa ShapeRenderer
+        // ShapeRenderer
         shapeRenderer = new ShapeRenderer();
 
-        // Carrega textura de background de forma segura (se não existir, deixa null)
+        // carrega background
         if (Gdx.files.internal("background.png").exists()) {
             texturaBackground = new Texture(Gdx.files.internal("background.png"));
         } else {
-            texturaBackground = null; // fallback: sem background
+            texturaBackground = null;
         }
 
-        // --- Carrega fonte TTF (nova fonte) para o corpo do texto ---
-        if (Gdx.files.internal(NOME_FONTE).exists()) {
-            FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal(NOME_FONTE));
-            FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
-
-            // tamanho base adaptativo para ficar legível em diferentes resoluções
-            int baseSize = Math.max(20, Gdx.graphics.getWidth() / 40);
-            parameter.size = baseSize;
-            parameter.color = Color.WHITE;
-            parameter.shadowOffsetX = 2;
-            parameter.shadowOffsetY = 2;
-            parameter.shadowColor = new Color(0, 0, 0, 0.6f);
-
-            font = generator.generateFont(parameter);
-            generator.dispose();
+        // click curto (som do botão)
+        if (Gdx.files.internal("click_botao_madeira.mp3").exists()) {
+            clickSound = Gdx.audio.newSound(Gdx.files.internal("click_botao_madeira.mp3"));
         } else {
-            // fallback: fonte padrão (se não tiver TTF)
-            font = new BitmapFont();
-            font.getData().setScale(1f);
+            clickSound = null;
         }
 
-        // titulo - formatação
-        titleFont = new BitmapFont();    // fonte padrão
-        titleFont.getData().setScale(3.2f);    // escala do titulo
+        // sons de vitória/derrota
+        if (Gdx.files.internal("perdeu.mp3").exists()) {
+            perdeuSom = Gdx.audio.newMusic(Gdx.files.internal("perdeu.mp3"));
+        } else {
+            perdeuSom = null;
+        }
+        if (Gdx.files.internal("ganhou.mp3").exists()) {
+            ganhouSom = Gdx.audio.newMusic(Gdx.files.internal("ganhou.mp3"));
+        } else {
+            ganhouSom = null;
+        }
 
-        // Armazena e calcula as estatísticas
+        // Carrega TTF apenas para o botão (se existir)
+        if (Gdx.files.internal(NOME_FONTE).exists()) {
+            FreeTypeFontGenerator gen = new FreeTypeFontGenerator(Gdx.files.internal(NOME_FONTE));
+            FreeTypeFontGenerator.FreeTypeFontParameter param = new FreeTypeFontGenerator.FreeTypeFontParameter();
+            param.size = Math.max(18, Gdx.graphics.getWidth() / 50);
+            param.color = Color.WHITE;
+            font = gen.generateFont(param);
+            gen.dispose();
+        } else {
+            font = null;
+        }
+
+        // título e estatísticas: fonte bitmap padrão
+        titleFont = new BitmapFont();
+        titleFont.getData().setScale(3.2f);
+
+        // estatísticas
         this.finalTime = time;
-        // CONVERSÃO: Distância em metros
         this.finalDistance = distance / UNITS_PER_METER;
         this.finalPresses = presses;
+        this.avgSpeed = (time > 0) ? this.finalDistance / time : 0f;
 
-        // CONVERSÃO: Velocidade Média em metros/s
-        this.avgSpeed = (time > 0) ? this.finalDistance / time : 0;
-
-        // Define a mensagem e a cor com base no estado final
+        // mensagem e cor
         if (estadoFinal == EstadoJogo.VENCEU) {
-            message = "VITÓRIA! Você pegou a comida!";
-            messageColor = Color.GREEN;
+            this.message = "VITORIA! Voce pegou a comida!";
+            this.messageColor = Color.GREEN;
+            venceu = true;
         } else {
-            message = "FIM DE JOGO. A raposa te pegou.";
-            messageColor = Color.RED;
+            this.message = "FIM DE JOGO. A raposa te pegou.";
+            this.messageColor = Color.RED;
+            venceu = false;
         }
+
+        somTocado = false;
     }
 
     @Override
@@ -103,12 +139,31 @@ public class TelaFimDeJogo implements Screen {
         float w = Gdx.graphics.getWidth();
         float h = Gdx.graphics.getHeight();
 
-        Gdx.gl.glClearColor(0.06f, 0.06f, 0.07f, 1);
+        // limpa a tela
+        Gdx.gl.glClearColor(0.06f, 0.06f, 0.07f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         camera.update();
         game.batch.setProjectionMatrix(camera.combined);
         shapeRenderer.setProjectionMatrix(camera.combined);
+
+        // toca som de vitória/derrota apenas uma vez
+        if (!somTocado) {
+            if (venceu) {
+                if (ganhouSom != null) {
+                    ganhouSom.setVolume(0.8f);
+                    ganhouSom.setLooping(false);
+                    ganhouSom.play();
+                }
+            } else {
+                if (perdeuSom != null) {
+                    perdeuSom.setVolume(0.8f);
+                    perdeuSom.setLooping(false);
+                    perdeuSom.play();
+                }
+            }
+            somTocado = true;
+        }
 
         // desenha background
         game.batch.begin();
@@ -117,110 +172,188 @@ public class TelaFimDeJogo implements Screen {
         }
         game.batch.end();
 
-        // Parâmetros do painel
-        float panelW = Math.min(w * 0.75f, 720f);
-        float panelH = Math.min(h * 0.6f, 420f);
+        // dimensões do painel
+        float panelW = Math.min(w * 0.75f, 900f);
+        float panelH = Math.min(h * 0.62f, 600f);
         float panelX = (w - panelW) / 2f;
         float panelY = (h - panelH) / 2f;
 
-        // Desenha painel e borda
+        // sombra do painel
         shapeRenderer.begin(ShapeType.Filled);
-        shapeRenderer.setColor(new Color(0f, 0f, 0f, 0.72f)); // fundo do painel
+        shapeRenderer.setColor(new Color(0f, 0f, 0f, 0.55f));
+        shapeRenderer.rect(panelX + 10f, panelY - 10f, panelW, panelH);
+        shapeRenderer.end();
+
+        // painel principal
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(new Color(0f, 0f, 0f, 0.78f));
         shapeRenderer.rect(panelX, panelY, panelW, panelH);
         shapeRenderer.end();
 
-        shapeRenderer.begin(ShapeType.Line);
-        shapeRenderer.setColor(Color.WHITE);
-        shapeRenderer.rect(panelX + 2f, panelY + 2f, panelW - 4f, panelH - 4f); // borda fina
+        // barra superior colorida
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(messageColor.cpy().mul(0.9f));
+        shapeRenderer.rect(panelX, panelY + panelH - 60f, panelW, 60f);
         shapeRenderer.end();
 
-        // Começa a desenhar texto
+        // borda do painel
+        shapeRenderer.begin(ShapeType.Line);
+        shapeRenderer.setColor(Color.WHITE);
+        shapeRenderer.rect(panelX + 2f, panelY + 2f, panelW - 4f, panelH - 4f);
+        shapeRenderer.end();
+
+        //Desenha título e estatísticas
         game.batch.begin();
 
-        // título
-        titleFont.setColor(messageColor);
-        // Ajuste dinâmico da escala do título para caber dentro do painel, se necessário
-        float desiredTitleScale = 3.2f;
-        titleFont.getData().setScale(desiredTitleScale);
+        // título (na barra)
+        titleFont.setColor(Color.WHITE);
+        titleFont.getData().setScale(2.4f);
         GlyphLayout layoutTitle = new GlyphLayout(titleFont, message);
-
-        // se título maior que painel (com margens), reduz proporcionalmente
-        float maxTitleWidth = panelW - 40f; // margem interna
+        float maxTitleWidth = panelW - 40f;
         if (layoutTitle.width > maxTitleWidth) {
-            float scaleFactor = maxTitleWidth / layoutTitle.width;
-            titleFont.getData().setScale(desiredTitleScale * scaleFactor); // ajuste para caber
-            layoutTitle = new GlyphLayout(titleFont, message);             // recomputa layout
+            float sf = maxTitleWidth / layoutTitle.width;
+            titleFont.getData().setScale(2.4f * sf);
+            layoutTitle.setText(titleFont, message);
         }
-
-        // Centraliza o título dentro do painel
-        float xTitle = panelX + (panelW - layoutTitle.width) / 2f; //  centralizado no painel
-        float yTitle = panelY + panelH - 40f;
+        float xTitle = panelX + (panelW - layoutTitle.width) / 2f;
+        float yTitle = panelY + panelH - 18f; // posição na barra
         titleFont.draw(game.batch, message, xTitle, yTitle);
 
-        // ESTATÍSTICAS
-        // usa 'font' (TTF carregada) para estatísticas
-        font.setColor(Color.WHITE);
-        float statsScale = 1.2f;
-        font.getData().setScale(statsScale);
-        // Formata tempo como mm:ss.xx
-        int minutes = (int) (finalTime / 60);
-        float secondsFloat = finalTime - minutes * 60;
-        String timeFormatted = String.format("%02d:%05.2f", minutes, secondsFloat);
+        // calcula onde ficará o botão (antes de desenhar as estatísticas, pois o layout depende da posição do botão)
+        botaoX = panelX + (panelW - BOTAO_LARGURA) / 2f;
+        botaoY = panelY + 40f;
 
+        // Estatísticas: criamos um bloco e centralizamos verticalmente entre o final do título e o topo do botão
+        String timeFormatted = formatTempo(finalTime);
         String stats = String.format(
-            "Estatísticas da Corrida:\n" +
-                "  Tempo Gasto: %s (mm:ss)\n" +
-                "  Distância Percorrida: %.2f m\n" +
-                "  Cliques na Barra de Espaço: %d\n" +
-                "  Média de Velocidade: %.2f m/s",
+            "Tempo: %s\nDistância: %.2f m\nCliques: %d\nVel. média: %.2f m/s",
             timeFormatted, finalDistance, finalPresses, avgSpeed
         );
 
-        GlyphLayout layoutStats = new GlyphLayout(font, stats);
+        // escala inicial para stats
+        float statsScale = 1.05f;
+        titleFont.getData().setScale(statsScale);
+        titleFont.setColor(Color.LIGHT_GRAY);
+        GlyphLayout layoutStats = new GlyphLayout(titleFont, stats);
 
-        // Se as estatísticas excederem a largura do painel, reduz a escala proporcionalmente
-        float maxStatsWidth = panelW - 60f;
-        if (layoutStats.width > maxStatsWidth) {
-            float scaleFactor = maxStatsWidth / layoutStats.width;
-            font.getData().setScale(statsScale * scaleFactor); // ajuste para caber
-            layoutStats = new GlyphLayout(font, stats);        // recomputa layout
+        // área vertical disponível entre o fim do título e o topo do botão
+        float titleBottom = yTitle - layoutTitle.height;               // baseline do título menos sua altura
+        float buttonTop = botaoY + BOTAO_ALTURA;                       // topo do botão
+        float availableTop = titleBottom - 12f;                        // pequeno espaçamento
+        float availableBottom = buttonTop + 12f;                       // pequeno espaçamento
+        float availableHeight = availableTop - availableBottom;        // altura disponível para o bloco de stats
+
+        // Se o layoutStats for maior que a área disponível, reduza a escala proporcionalmente
+        if (layoutStats.height > availableHeight && availableHeight > 8f) {
+            float scaleFactor = availableHeight / layoutStats.height;
+            statsScale *= Math.max(0.5f, scaleFactor); // não reduzir demais (< 0.5)
+            titleFont.getData().setScale(statsScale);
+            layoutStats.setText(titleFont, stats);
         }
 
-        // centraliza bloco de estatísticas dentro do painel, abaixo do título
-        float xStats = panelX + (panelW - layoutStats.width) / 2f; // centralizado no painel
-        float yStats = yTitle - layoutTitle.height - 20f; // espaço entre título e stats
-        font.draw(game.batch, stats, xStats, yStats);
+        // agora centraliza verticalmente o bloco de estatísticas dentro da área disponível
+        float centerY = availableBottom + (availableHeight / 2f) + (layoutStats.height / 2f);
+        float xStats = panelX + (panelW - layoutStats.width) / 2f;
+        float yStats = centerY;
 
-        // --- INSTRUÇÃO ---
-        font.getData().setScale(1.0f);
-        font.setColor(Color.YELLOW);
-        String instr = "Toque/Clique para voltar ao Menu";
-        GlyphLayout layoutInstr = new GlyphLayout(font, instr);
-        // centraliza instrução na parte inferior do painel
-        float xInstr = panelX + (panelW - layoutInstr.width) / 2f; // <-- centralizado no painel
-        float yInstr = panelY + 30f + layoutInstr.height;
-        font.draw(game.batch, instr, xInstr, yInstr);
+        // desenha as estatísticas
+        titleFont.draw(game.batch, stats, xStats, yStats);
 
         game.batch.end();
 
-        // Lógica para voltar ao Menu Principal
+        // Desenha botão (com feedback visual)
+        // Detecta se há toque/pressionamento dentro do botão para desenhar cor de pressionado
+        boolean pressionandoBotao = false;
+        if (Gdx.input.isTouched()) {
+            // converte coordenadas do touch
+            float tx = Gdx.input.getX();
+            float ty = h - Gdx.input.getY();
+            if (tx >= botaoX && tx <= botaoX + BOTAO_LARGURA && ty >= botaoY && ty <= botaoY + BOTAO_ALTURA) {
+                pressionandoBotao = true;
+            }
+        }
+
+        // desenha sombra e retângulo do botão
+        shapeRenderer.begin(ShapeType.Filled);
+        shapeRenderer.setColor(new Color(0f, 0f, 0f, 0.6f));
+        shapeRenderer.rect(botaoX + 6f, botaoY - 6f, BOTAO_LARGURA, BOTAO_ALTURA);
+        shapeRenderer.setColor(pressionandoBotao ? corFundoPressionado : corFundoNormal);
+        shapeRenderer.rect(botaoX, botaoY, BOTAO_LARGURA, BOTAO_ALTURA);
+        shapeRenderer.end();
+
+        // borda do botão
+        shapeRenderer.begin(ShapeType.Line);
+        shapeRenderer.setColor(Color.WHITE);
+        shapeRenderer.rect(botaoX, botaoY, BOTAO_LARGURA, BOTAO_ALTURA);
+        shapeRenderer.end();
+
+        // texto do botão
+        game.batch.begin();
+        String botaoTexto = "Clique aqui para voltar ao Menu";
+        BitmapFont botFont = (font != null) ? font : titleFont;
+        botFont.setColor(Color.WHITE);
+
+        // Ajusta escala do texto do botão para caber
+        float desiredBotScale = 1.0f;
+        botFont.getData().setScale(desiredBotScale);
+        GlyphLayout layoutBot = new GlyphLayout(botFont, botaoTexto);
+        float maxBotWidth = BOTAO_LARGURA - 24f;
+        if (layoutBot.width > maxBotWidth) {
+            float sf = maxBotWidth / layoutBot.width;
+            botFont.getData().setScale(desiredBotScale * sf);
+            layoutBot.setText(botFont, botaoTexto);
+        }
+
+        float xBot = botaoX + (BOTAO_LARGURA - layoutBot.width) / 2f;
+        float yBot = botaoY + (BOTAO_ALTURA + layoutBot.height) / 2f - 6f;
+        botFont.draw(game.batch, botaoTexto, xBot, yBot);
+        game.batch.end();
+
+        //Input: clique final (justTouched) para executar ação
         if (Gdx.input.justTouched()) {
-            game.setScreen(new TelaMenu(game));
-            dispose();
+            float touchX = Gdx.input.getX();
+            float touchY = h - Gdx.input.getY();
+
+            if (touchX >= botaoX && touchX <= botaoX + BOTAO_LARGURA
+                && touchY >= botaoY && touchY <= botaoY + BOTAO_ALTURA) {
+
+                // som de clique curto
+                if (clickSound != null) clickSound.play(0.9f);
+
+                // para músicas ativas (opcional)
+                if (ganhouSom != null && ganhouSom.isPlaying()) ganhouSom.stop();
+                if (perdeuSom != null && perdeuSom.isPlaying()) perdeuSom.stop();
+
+                // volta ao menu
+                game.setScreen(new TelaMenu(game));
+                dispose();
+            }
         }
     }
 
+    // util: formata segundos para mm:ss.xx
+    private String formatTempo(float segundos) {
+        int minutes = (int) (segundos / 60f);
+        float secs = segundos - minutes * 60;
+        return String.format("%02d:%05.2f", minutes, secs);
+    }
+
+    // lifecycle mínimos
     @Override public void show() {}
     @Override public void resize(int width, int height) { camera.setToOrtho(false, width, height); }
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
 
+    // limpeza segura de recursos
     @Override
     public void dispose() {
         if (font != null) font.dispose();
         if (titleFont != null) titleFont.dispose();
         if (shapeRenderer != null) shapeRenderer.dispose();
         if (texturaBackground != null) texturaBackground.dispose();
+        if (clickSound != null) clickSound.dispose();
+        if (ganhouSom != null) ganhouSom.dispose();
+        if (perdeuSom != null) perdeuSom.dispose();
     }
 }
