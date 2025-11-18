@@ -6,223 +6,248 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.ScreenUtils;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator.FreeTypeFontParameter;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.g2d.GlyphLayout;
+import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.math.MathUtils;
 
 public class TelaJogo implements Screen {
 
     final JogoPrincipal game;
 
-    public TelaJogo(final JogoPrincipal game) {
+    private final float UNIDADES_PER_METER = 100f;
+    private float DISTANCIA_VITORIA_METROS;
+    private final float DISTANCIA_VITORIA;
+
+    private int currentLevel;
+
+    public TelaJogo(final JogoPrincipal game, int level) {
         this.game = game;
-        this.DISTANCIA_VITORIA = DISTANCIA_VITORIA_METROS * UNIDADES_POR_METRO;
+        this.currentLevel = level;
+
+        // Configuração de Distância
+        if (level == 3) {
+            this.DISTANCIA_VITORIA_METROS = 500f; // Sprint Final (Difícil)
+        } else if (level == 2) {
+            this.DISTANCIA_VITORIA_METROS = 1000f; // Maratona
+        } else {
+            this.DISTANCIA_VITORIA_METROS = 300f; // Tutorial
+        }
+
+        this.DISTANCIA_VITORIA = DISTANCIA_VITORIA_METROS * UNIDADES_PER_METER;
     }
 
-    // ====================================================================================
-    // ATRIBUTOS
-    // ====================================================================================
-
-    // Entidades
+    // Atributos
     private Jogador jogador;
     private Raposa raposa;
     private Cesta cesta;
-
-    // Gráficos e Câmera
-    FitViewport viewport;
-    OrthographicCamera camera;
-    Texture texturaFundo;
-
-    // Lógica de Perseguição e Jogo
-    private final float UNIDADES_POR_METRO = 100f;
-    private final float DISTANCIA_VITORIA_METROS = 200f;
-    private final float DISTANCIA_VITORIA;
-    private final float DELAY_SPAWN_RAPOSA = 1.0f;
-
-    private float larguraMundo;
-    private float alturaMundo;
-    private float tempoJogo = 0f;
-    private int cliquesBarraEspaco = 0; // Variável para armazenar a estatística
-    private float posicaoInicialX;
-
-    private float playerSize = 80f;
-
-    // Estado do Jogo (usa o enum traduzido)
-    EstadoJogo estado = EstadoJogo.CORRENDO;
-
-    // config som dos passos
+    private FitViewport viewport;
+    private OrthographicCamera camera;
+    private BitmapFont fontHUD;
+    private Texture[] layers;
+    private float[] parallaxSpeeds;
+    private final int NUM_LAYERS = 7;
     private Sound passoSound;
-    private float prevPlayerX = 0f; // posição do jogador no frame anterior
-    private float stepTimer = 0f; // tempo acumulado para o próximo passo do jogador
-    private float stepInterval = 0.35f; // intervalo entre passos
-    private float moveThreshold = 1f;  // distancia minima
-
-    // ====================================================================================
-    // MÉTODOS DA INTERFACE SCREEN
-    // ====================================================================================
+    private Music gameMusic;
+    private Sound somOnca;
+    private Sound somOnca2;
+    private final float MIN_VELOCIDADE_SOM = 10f;
+    private final float INTERVALO_PASSO = 0.35f;
+    private float stepTimer = 0f;
+    private float distanciaUltimoRugido = 0f;
+    private float proximoRugidoDistancia = 0f;
+    private float tempoJogo = 0f;
+    private int cliquesBarraEspaco = 0;
+    private final float larguraMundo = 1280f;
+    private final float alturaMundo = 720f;
+    private float posicaoInicialX;
+    private final float TAMANHO_JOGADOR = 150f;
+    private final float TAMANHO_RAPOSA_FATOR = 1.6f;
+    private final float CHAO_Y = 100f;
+    private final float RESET_THRESHOLD = 100000f;
+    private final float RESET_AMOUNT = 90000f;
+    EstadoJogo estado = EstadoJogo.CORRENDO;
 
     @Override
     public void show() {
-        // Inicialização de Texturas
-        texturaFundo = new Texture("background.png");
-        texturaFundo.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
-
-        larguraMundo = texturaFundo.getWidth();
-        alturaMundo = texturaFundo.getHeight();
-
-        camera = new OrthographicCamera();
+        camera = new OrthographicCamera(larguraMundo, alturaMundo);
         viewport = new FitViewport(larguraMundo, alturaMundo, camera);
+        viewport.apply();
 
-        float inicioX = larguraMundo / 2f;
-
-        // Inicializa Entidades
-        jogador = new Jogador(inicioX, 0f, playerSize, larguraMundo);
-        raposa = new Raposa(100f);
-        cesta = new Cesta(70f);
-
-        // Configurações iniciais
-        posicaoInicialX = jogador.x;
-        tempoJogo = 0f;
-        cliquesBarraEspaco = 0;
-        estado = EstadoJogo.CORRENDO;
-
-        camera.position.set(larguraMundo / 2f, alturaMundo / 2f, 0);
-
-        if (Gdx.files.internal("passos.mp3").exists()){
-            passoSound = Gdx.audio.newSound(Gdx.files.internal("passos.mp3"));
-        }else{
-            passoSound = null;
+        layers = new Texture[NUM_LAYERS];
+        for (int i = 0; i < NUM_LAYERS; i++) {
+            layers[i] = new Texture(Gdx.files.internal("Fundo" + (i + 1) + ".png"));
+            layers[i].setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
         }
 
-        prevPlayerX = jogador.x;
+        parallaxSpeeds = new float[] { 0.2f, 0.4f, 0.3f, 0.5f, 0.7f, 0.05f, 1.0f };
+
+        posicaoInicialX = larguraMundo / 2f;
+        final float TAMANHO_RAPOSA = TAMANHO_JOGADOR * TAMANHO_RAPOSA_FATOR;
+
+        // CONFIGURAÇÃO DE DIFICULDADE DO JOGADOR (DESACELERAÇÃO)
+        float desaceleracaoJogador;
+        if (currentLevel == 3) {
+            desaceleracaoJogador = 5.5f; // MUITO DIFÍCIL no Nível 3
+        } else {
+            desaceleracaoJogador = 2.5f; // Padrão
+        }
+
+        // Instancia jogador com a desaceleração correta
+        jogador = new Jogador(posicaoInicialX, CHAO_Y, TAMANHO_JOGADOR, larguraMundo, desaceleracaoJogador);
+        raposa = new Raposa(TAMANHO_RAPOSA);
+        cesta = new Cesta(TAMANHO_JOGADOR, CHAO_Y);
+
+        raposa.x = jogador.x - (larguraMundo * 0.4f);
+        raposa.y = CHAO_Y;
+        raposa.ativo = true;
+
+        setupFont();
+
+        try { passoSound = Gdx.audio.newSound(Gdx.files.internal("passos.mp3")); } catch (Exception e) {}
+        try {
+            gameMusic = Gdx.audio.newMusic(Gdx.files.internal("perseguicao.mp3"));
+            gameMusic.setLooping(true);
+            gameMusic.setVolume(0.9f);
+            gameMusic.play();
+        } catch (Exception e) {}
+
+        try {
+            somOnca = Gdx.audio.newSound(Gdx.files.internal("somOnca.mp3"));
+            somOnca2 = Gdx.audio.newSound(Gdx.files.internal("somOnca2.mp3"));
+
+            // CONFIGURAÇÃO DE DIFICULDADE DE SOM (FREQUÊNCIA)
+            if (currentLevel == 3) {
+                proximoRugidoDistancia = MathUtils.random(15f, 30f); // Rugido muito frequente
+            } else {
+                proximoRugidoDistancia = MathUtils.random(50f, 70f); // Padrão
+            }
+        } catch (Exception e) {}
+
+        Gdx.input.setInputProcessor(null);
+    }
+
+    private void setupFont() {
+        String NOME_FONTE = "fonteMenu.ttf";
+        FreeTypeFontGenerator generator = null;
+        if (Gdx.files.internal(NOME_FONTE).exists()) {
+            generator = new FreeTypeFontGenerator(Gdx.files.internal(NOME_FONTE));
+        }
+        FreeTypeFontParameter params = new FreeTypeFontParameter();
+        params.size = 30;
+        params.color = Color.WHITE;
+        params.shadowColor = Color.BLACK;
+        params.shadowOffsetX = 2;
+        params.shadowOffsetY = 2;
+        if (generator != null) {
+            fontHUD = generator.generateFont(params);
+            generator.dispose();
+        } else {
+            fontHUD = new BitmapFont();
+            fontHUD.getData().setScale(1.0f);
+        }
     }
 
     @Override
     public void render(float delta) {
         if (estado == EstadoJogo.CORRENDO) {
+
+            if (Gdx.input.isKeyJustPressed(Input.Keys.P) && !cesta.ativo) {
+                jogador.x = DISTANCIA_VITORIA;
+                Gdx.app.log("DevTool", "Cesta ativada manualmente (Tecla P).");
+            }
+
             tempoJogo += delta;
-
-            // 1. INPUT e Coleta de Estatísticas
             jogador.inputClique();
-            cliquesBarraEspaco = jogador.cliquesBarraEspaco; // <-- Coleta CORRIGIDA
+            cliquesBarraEspaco = jogador.cliquesBarraEspaco;
 
-            // 2. ATUALIZAÇÃO DE ENTIDADES
             jogador.atualizar(delta);
-            checarSpawnRaposa();
             if (raposa.ativo) raposa.atualizar(delta, jogador.x, camera, viewport);
 
-            // LÓGICA PASSOS
-            passoSound.play(0.5f, 0.8f, 0f);
-            //0.5 - reduz volume
-            //0.8 - som lento e grave
-            //0 - centraliza o som
+            checarColisoes();
+            checarVitoria();
 
+            if (jogador.x > RESET_THRESHOLD) {
+                final float deltaReset = RESET_AMOUNT;
+                jogador.x -= deltaReset;
+                raposa.x -= deltaReset;
+                cesta.x -= deltaReset;
+                posicaoInicialX -= deltaReset;
+            }
 
-            // 3. Lógica de Vitória
-            cesta.checarSpawn(jogador.x, jogador.tamanho, jogador.x - posicaoInicialX, DISTANCIA_VITORIA);
+            if (passoSound != null) {
+                if (jogador.velocidadeAtual > MIN_VELOCIDADE_SOM) {
+                    stepTimer += delta;
+                    if (stepTimer >= INTERVALO_PASSO) {
+                        passoSound.play(0.4f, 1.0f, 0f);
+                        stepTimer = 0f;
+                    }
+                } else {
+                    stepTimer = 0f;
+                }
+            }
 
-            // 4. CÂMERA E COLISÕES
-            camera.position.x = jogador.x + jogador.tamanho / 2f;
+            if (somOnca != null && somOnca2 != null && raposa.ativo) {
+                float distanciaPercorridaMetros = (jogador.x - posicaoInicialX) / UNIDADES_PER_METER;
+
+                if ((distanciaPercorridaMetros - distanciaUltimoRugido) >= proximoRugidoDistancia) {
+                    if (MathUtils.randomBoolean()) somOnca.play(1.0f);
+                    else somOnca2.play(1.0f);
+
+                    distanciaUltimoRugido = distanciaPercorridaMetros;
+
+                    // RECALCULA PRÓXIMO RUGIDO BASEADO NO NÍVEL
+                    if (currentLevel == 3) {
+                        proximoRugidoDistancia = MathUtils.random(15f, 30f);
+                    } else {
+                        proximoRugidoDistancia = MathUtils.random(50f, 70f);
+                    }
+                }
+            }
+
+            camera.position.x = jogador.x + (jogador.tamanho / 2f);
+            camera.position.y = alturaMundo / 2f;
             camera.update();
 
-            checarColisoes();
+        } else if (estado == EstadoJogo.FIM_DE_JOGO || estado == EstadoJogo.VENCEU) {
+            if (passoSound != null) passoSound.stop();
+            if (gameMusic != null) gameMusic.stop();
+            navegarParaFimDeJogo(estado);
         }
 
-        // 5. DESENHO
         desenhar();
     }
 
-    // Método que decide quando tocar passos
-    private void handleFootsteps(float delta) {
-        if (passoSound == null) return; // não faz nada se som não carregou
-
-        // calcula deslocamento horizontal desde o frame anterior
-        float dx = Math.abs(jogador.x - prevPlayerX);
-
-        // aqui você pode refinar: talvez checar se jogador está "no chão" se houver pulo
-        boolean isMoving = dx > moveThreshold * (1f/UNIDADES_POR_METRO);
-        // OBS: moveThreshold está em pixels do mundo, ajustamos por unidade por metro para ficar coerente.
-        // Se seu Jogador usa velocidade muito grande/pequena, ajuste moveThreshold.
-
-        if (isMoving) {
-            // acumula tempo enquanto move
-            stepTimer += delta;
-            if (stepTimer >= stepInterval) {
-                // toca som curto de passo
-                passoSound.play(0.7f); // volume 0.7 — ajuste se necessário
-                stepTimer = 0f;
-            }
-        } else {
-            // se não está se movendo, resetamos temporizador pra evitar tocar passos instantaneamente
-            stepTimer = 0f;
-        }
-
-        // atualiza prevPlayerX para o próximo frame
-        prevPlayerX = jogador.x;
-    }
-
-    @Override
-    public void resize(int width, int height) {
-        viewport.update(width, height, true);
-    }
-    @Override
-    public void pause() {}
-    @Override
-    public void resume() {}
-    @Override
-    public void hide() {}
-
-    @Override
-    public void dispose() {
-        jogador.dispose();
-        raposa.dispose();
-        cesta.dispose();
-        texturaFundo.dispose();
-
-        if (passoSound != null) {
-            passoSound.dispose();
-        }
-    }
-
-    // --- MÉTODOS DE LÓGICA ---
-
-    private void setupAnimation() {
-        // Método movido para a classe Jogador.java
-    }
-
-    private void checarSpawnRaposa() {
-        if (!raposa.ativo && tempoJogo >= DELAY_SPAWN_RAPOSA) {
-            raposa.ativar(jogador.x, viewport);
-        }
-    }
-
     private void checarColisoes() {
-        // Colisão Raposa
         if (raposa.ativo && jogador.limites.overlaps(raposa.limites)) {
-            finalizarJogo(EstadoJogo.FIM_DE_JOGO);
-            return;
-        }
-
-        // Colisão Cesta
-        if (cesta.ativo && jogador.limites.overlaps(cesta.limites)) {
-            finalizarJogo(EstadoJogo.VENCEU);
+            navegarParaFimDeJogo(EstadoJogo.FIM_DE_JOGO);
         }
     }
 
-    private void finalizarJogo(EstadoJogo estadoFinal) {
-        estado = estadoFinal;
+    private void checarVitoria() {
+        float distanciaAtual = jogador.x - posicaoInicialX;
+        cesta.checarSpawn(jogador.x, jogador.tamanho, distanciaAtual, DISTANCIA_VITORIA);
 
-        // Calcula a distância total percorrida
+        if (cesta.ativo && jogador.limites.overlaps(cesta.limites)) {
+            navegarParaFimDeJogo(EstadoJogo.VENCEU);
+        }
+    }
+
+    private void navegarParaFimDeJogo(EstadoJogo estadoFinal) {
+        estado = estadoFinal;
+        if (passoSound != null) passoSound.stop();
+        if (gameMusic != null) gameMusic.stop();
+
         float distanciaPercorrida = jogador.x - posicaoInicialX;
 
-        // Manda para a tela de Game Over/Vitória com todas as estatísticas
-        game.setScreen(new TelaFimDeJogo(game, estadoFinal, tempoJogo, distanciaPercorrida, cliquesBarraEspaco));
+        // Passa o Nível Atual
+        game.setScreen(new TelaFimDeJogo(game, estadoFinal, tempoJogo, distanciaPercorrida, cliquesBarraEspaco, currentLevel));
         dispose();
     }
 
@@ -235,30 +260,67 @@ public class TelaJogo implements Screen {
 
         game.batch.begin();
 
-        // 1. Desenho do Fundo (Paralaxe)
-        float parallaxX = camera.position.x * 0.0005f;
-        game.batch.draw(texturaFundo,
-            camera.position.x - viewport.getWorldWidth() / 2,
-            camera.position.y - viewport.getWorldHeight() / 2,
-            viewport.getWorldWidth(),
-            viewport.getWorldHeight(),
-            parallaxX, 0 + 1,
-            parallaxX + 1, 0
-        );
-
-        // 2. Desenho do Inimigo
-        if (raposa.ativo) {
-            game.batch.draw(raposa.textura, raposa.x, raposa.y, raposa.tamanho, raposa.tamanho);
+        for (int i = 0; i < NUM_LAYERS - 1; i++) {
+            Texture layer = layers[i];
+            float parallaxSpeed = parallaxSpeeds[i];
+            float scaledHeight = viewport.getWorldHeight();
+            float aspectRatio = (float)layer.getWidth() / layer.getHeight();
+            float scaledWidth = scaledHeight * aspectRatio;
+            float parallaxOffset = camera.position.x * parallaxSpeed;
+            float offsetModulo = parallaxOffset % scaledWidth;
+            if (offsetModulo < 0) offsetModulo += scaledWidth;
+            float startX = camera.position.x - viewport.getWorldWidth() / 2;
+            startX -= offsetModulo;
+            for (int j = -1; j <= 2; j++) {
+                game.batch.draw(layer, startX + (j * scaledWidth), 0, scaledWidth, scaledHeight);
+            }
         }
 
-        // 3. Desenho da Cesta
-        if (cesta.ativo) {
-            game.batch.draw(cesta.textura, cesta.x, cesta.y, cesta.tamanho, cesta.tamanho);
-        }
-
-        // 4. Desenho do Jogador
+        if (raposa.ativo) game.batch.draw(raposa.frameAtual, raposa.x, raposa.y, raposa.tamanho, raposa.tamanho);
+        if (cesta.ativo) game.batch.draw(cesta.textura, cesta.x, cesta.y, cesta.tamanho, cesta.tamanho);
         game.batch.draw(jogador.frameAtual, jogador.x, jogador.y, jogador.tamanho, jogador.tamanho);
 
+        {
+            int i = NUM_LAYERS - 1;
+            Texture layer = layers[i];
+            float parallaxSpeed = parallaxSpeeds[i];
+            float scaledHeight = viewport.getWorldHeight();
+            float aspectRatio = (float)layer.getWidth() / layer.getHeight();
+            float scaledWidth = scaledHeight * aspectRatio;
+            float parallaxOffset = camera.position.x * parallaxSpeed;
+            float offsetModulo = parallaxOffset % scaledWidth;
+            if (offsetModulo < 0) offsetModulo += scaledWidth;
+            float startX = camera.position.x - viewport.getWorldWidth() / 2;
+            startX -= offsetModulo;
+            for (int j = -1; j <= 2; j++) {
+                game.batch.draw(layer, startX + (j * scaledWidth), 0, scaledWidth, scaledHeight);
+            }
+        }
+
+        float distanciaAtualMetros = (jogador.x - posicaoInicialX) / UNIDADES_PER_METER;
+        String hudTexto = String.format("Nível %d | Distância: %.0f / %.0f m", currentLevel, distanciaAtualMetros, DISTANCIA_VITORIA_METROS);
+        float hudX = camera.position.x - viewport.getWorldWidth() / 2 + 20;
+        float hudY = camera.position.y + viewport.getWorldHeight() / 2 - 20;
+        fontHUD.draw(game.batch, hudTexto, hudX, hudY);
+
         game.batch.end();
+    }
+
+    @Override public void resize(int width, int height) { viewport.update(width, height); }
+    @Override public void pause() {}
+    @Override public void resume() {}
+    @Override public void hide() {}
+
+    @Override
+    public void dispose() {
+        jogador.dispose();
+        raposa.dispose();
+        cesta.dispose();
+        for (Texture layer : layers) { if (layer != null) layer.dispose(); }
+        if (fontHUD != null) fontHUD.dispose();
+        if (passoSound != null) passoSound.dispose();
+        if (gameMusic != null) gameMusic.dispose();
+        if (somOnca != null) somOnca.dispose();
+        if (somOnca2 != null) somOnca2.dispose();
     }
 }

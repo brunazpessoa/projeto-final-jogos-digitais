@@ -11,22 +11,19 @@ public class Cesta {
     public Texture textura;
     public boolean ativo = false;
 
-    private final float MARGEM_FATOR = 4f; // 4x o tamanho do jogador à frente da tela
+    private final float MARGEM_FATOR = 4f;
 
-    public Cesta(float tamanhoSprite) {
+    public Cesta(float tamanhoSprite, float yInicial) {
         this.tamanho = tamanhoSprite;
+        this.y = yInicial;
         this.textura = new Texture("basket.png");
-        this.limites = new Rectangle(0, 0, tamanho, tamanho);
+        this.limites = new Rectangle(0, yInicial, tamanho, tamanho);
     }
 
     public void checarSpawn(float jogadorX, float tamanhoJogador, float distanciaAtual, float distanciaVitoria) {
-
         if (!ativo && distanciaAtual >= distanciaVitoria) {
             ativo = true;
-
-            // Posiciona a cesta no mundo (distância alvo + margem)
             this.x = jogadorX + tamanhoJogador * MARGEM_FATOR;
-            this.y = 0f; // No chão
             limites.setPosition(x, y);
         }
     }
