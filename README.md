@@ -47,7 +47,7 @@ Esse processo gerou aprendizados importantes sobre comunicação entre hardware 
 
 # 4. Conclusão
 O desenvolvimento do jogo demonstrou o potencial de integrar tecnologia, movimento físico e ludicidade para apoiar processos de reabilitação motora. A interação em tempo real entre o ato de pedalar e a resposta imediata do personagem contribui para aumentar o engajamento, reduzir a monotonia típica de exercícios repetitivos e oferecer ao paciente uma percepção clara de progresso, elementos essenciais para melhorar a adesão ao tratamento. <br>
-O jogo atingiu seus objetivos principais: funcionar de forma estável, interpretar corretamente o esforço físico do usuário e proporcionar uma experiência motivacional e acessível para diferentes perfis de pacientes. Além disso, o aumento gradual de dificuldade e a estrutura baseada em quilometragem permitem que o usuário evolua no próprio ritmo, favorecendo a consistência do treino. <br>
+O jogo atingiu seus objetivos principais: funcionar de forma estável, interpretar corretamente o esforço físico do usuário e proporcionar uma experiência motivacional e acessível para diferentes perfis de pacientes. Além disso, o aumento gradual de dificuldade e a estrutura baseada na distância permitem que o usuário evolua no próprio ritmo, favorecendo a consistência do treino. <br>
 Como trabalhos futuros, destacam-se melhorias na interface, inclusão de novos cenários e inimigos, sistema de pontuação mais detalhado, feedbacks visuais e sonoros mais ricos e possibilidade de registrar e acompanhar o desempenho do paciente ao longo do tempo. <br>
 
 
